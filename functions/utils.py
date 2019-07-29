@@ -37,7 +37,7 @@ def get_trainingMasks(path1):
         
     return trainingMasks
 
-def get_trainingImages(path2, scale):
+def get_trainingImages(path2, zeroScale, oneScale):
     
     """
     Get and scale training images saved during image annotation
@@ -45,8 +45,9 @@ def get_trainingImages(path2, scale):
     trainingImages=[]
     for i in path2:
         im = np.load(i)
-        image1 = im/scale
-        trainingImages.append(image1)
+        im[:,:,0] = im[:,:,0]/zeroScale
+        im[:,:,1] = im[:,:,1]/oneScale
+        trainingImages.append(im)
     new_images = np.stack(trainingImages, axis = 3)
     collman = np.transpose(new_images,(0,3,1,2))
     
@@ -168,6 +169,9 @@ def estimate_quality(collman,net,layer,slices=[2,3,4,5,6],th=0.4):
     dic=[]
     
     for s in slices:
+        dd = np.zeros((3,115,115))
+        for k in range(3):
+            dd[k] = resize(collmn[k,s],(115,115), order=1, preserve_range=True)
         y  = inference(net,collman[:,s])
         #plt.imshow(y[0].mean(axis=0))
         

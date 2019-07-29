@@ -30,8 +30,8 @@ class Simple3DNetwork(nn.Module):
         y = self.conv1(x)
         x = self.conv2(y.squeeze(2))
         if self.return_intermediate:
-            return F.sigmoid(x), y
-        return F.sigmoid(x), None
+            return torch.sigmoid(x), y
+        return torch.sigmoid(x), None
     
     def get_reg_params(self):
         return self.conv2.parameters()
@@ -62,7 +62,7 @@ class SimpleNetwork(nn.Module):
     def forward(self, x):
         y = self.conv1(x)
         #y = F.sigmoid(x)
-        xx = F.sigmoid(self.conv2(y))
+        xx = torch.sigmoid(self.conv2(y))
         xxx = xx[:,0:1].mul(xx[:,1:])
         if self.return_intermediate:
             return xxx, y
@@ -117,7 +117,7 @@ class DeepNetwork(nn.Module):
 
     def forward(self, x):
         x = self.net(x)
-        xx = F.sigmoid(self.final_convolution(x))
+        xx = torch.sigmoid(self.final_convolution(x))
         xxx = xx[:,0:1].mul(xx[:,1:])
         return xxx, None
     

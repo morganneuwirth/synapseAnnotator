@@ -33,6 +33,7 @@ from .networks import (
 from .training import (
     train_routine,
     create_generator,
+    create_test_generator,
     create_generator_3d
 )
 
