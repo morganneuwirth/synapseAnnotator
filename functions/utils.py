@@ -45,8 +45,8 @@ def get_trainingImages(path2, zeroScale, oneScale):
     trainingImages=[]
     for i in path2:
         im = np.load(i)
-        im[:,:,0] = im[:,:,0]/zeroScale
-        im[:,:,1] = im[:,:,1]/oneScale
+        im[0,:,:] = im[0,:,:]/zeroScale
+        im[1,:,:] = im[1,:,:]/oneScale
         trainingImages.append(im)
     new_images = np.stack(trainingImages, axis = 3)
     collman = np.transpose(new_images,(0,3,1,2))
