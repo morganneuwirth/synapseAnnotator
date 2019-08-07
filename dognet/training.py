@@ -8,7 +8,7 @@ from tqdm import tnrange
 import random
 
 
-def create_generator(data, labels, device = torch.device("cpu"), s=0 , size=(230, 230),batch_size= 10):
+def create_generator(data, labels, device = torch.device("cpu"), s=0 , size=(460, 460),batch_size= 10):
     """
     Generates training patches
     :param data: list of images
@@ -23,10 +23,10 @@ def create_generator(data, labels, device = torch.device("cpu"), s=0 , size=(230
         flip = np.random.randint(0, 1, batch_size)
         intensity = np.random.uniform(0.5,1.5,batch_size)
         for i in range(batch_size):
-            dd = np.zeros((3,115,115))
+            dd = np.zeros((3,int(size[0]/2), int(size[1]/2)))
             for k in range(3):
-                dd[k] = intensity[i]*resize(data[index[i]][k],(115,115), order=1, preserve_range=True)
-            ll = resize(labels[index[i]],(115,115), order=1, preserve_range=True)
+                dd[k] = intensity[i]*resize(data[index[i]][k],(size[0]/2,size[1]/2), order=1, preserve_range=True)
+            ll = resize(labels[index[i]],(size[0]/2,size[0]/2), order=1, preserve_range=True)
 
             if rot[i] > 0:
                 dd = np.rot90(dd)
@@ -42,7 +42,7 @@ def create_generator(data, labels, device = torch.device("cpu"), s=0 , size=(230
 
     return f
 
-def create_test_generator(data, labels, device = torch.device("cpu"), s=0 , size=(230, 230)):
+def create_test_generator(data, labels, device = torch.device("cpu"), s=0 , size=(460, 460)):
     n = len(data)
     
     def f(index = np.arange(n), n=n, size=size, s=s):
@@ -50,8 +50,8 @@ def create_test_generator(data, labels, device = torch.device("cpu"), s=0 , size
         l = np.zeros((n, 1, int(size[0]/2), int(size[1]/2)))
         for i in range(n):
             for k in range(3):
-                d[i,k] = resize(data[i][k],(115,115), order=1, preserve_range=True)
-            l[i,0] = resize(labels[i],(115,115), order=1, preserve_range=True)
+                d[i,k] = resize(data[i][k],(int(size[0]/2), int(size[1]/2)), order=1, preserve_range=True)
+            l[i,0] = resize(labels[i],(int(size[0]/2), int(size[1]/2)), order=1, preserve_range=True)
 
         d, l = torch.from_numpy(d).float().to(device), torch.from_numpy(l).float().to(device)
         return d, l
@@ -101,7 +101,21 @@ def print_percent(percent):
     sys.stdout.write("[%-20s] %d%%" % ('=' * percent, 5 * percent))
     sys.stdout.flush()
 
-    
+
+class focal_loss():
+    def __init__(self,alpha=0.9,gamma = 5):
+        self.alpha = alpha
+        self.gamma = gamma
+        
+    def loss(self,y_pred,y_tar):
+        epsilon = 1e-5
+        y_pred_clipped = torch.clamp(y_pred,epsilon,1.0-epsilon)
+        y_pred_t = y_tar*y_pred_clipped + (1-y_tar)*(1-y_pred_clipped)
+        alpha_t = 2*(self.alpha*y_tar+(1-self.alpha)*(1-y_tar))
+        fl = -torch.mean(alpha_t*((1-y_pred_t)**self.gamma)*torch.log(y_pred_t))
+       
+        return fl
+
 def soft_dice_loss(y_pred, y_true, epsilon=1e-6):
     ''' 
     Soft dice loss calculation for arbitrary batch size, number of classes, and number of spatial dimensions.
@@ -158,14 +172,16 @@ def train_routine(detector,
                   n_test_samples,
                   n_epoch=5000,
                   batch_size=10,
-                  loss="bce",
+                  loss="focal",
                   lr=0.01,
+                  alpha = 0.5,
+                  gamma = 1,
                   device = torch.device("cpu"),
                   margin=10,
                   decay_schedule = [50,0.99],
                   optimizer=None,
                   regk=0.,
-                  verbose=True):
+                  verbose=False):
     """
     Train a detector with respect to the data from generator
     :param detector: A detector network
@@ -197,6 +213,9 @@ def train_routine(detector,
         floss = soft_dice_loss
     elif loss=="weightbce":
         floss = create_weight(ky)
+    elif loss=="focal":
+        lossfunc = focal_loss(alpha,gamma)
+        floss = lossfunc.loss
     if verbose:
         print(ky,y.shape,y.shape[-1]*y.shape[-2],y[0,0].sum(),y[0,0].max())
         print(floss) 
@@ -207,6 +226,28 @@ def train_routine(detector,
     
     train_err = []
     test_err = []
+    
+    detector.eval()
+    randidx = np.random.permutation(n_train_samples)
+    randidx = np.append(randidx,randidx[:(batch_size-np.mod(n_train_samples,batch_size))]);
+    randidx = randidx.reshape(batch_size,-1)
+    curr_train_err = 0
+    for batch in range(randidx.shape[0]):
+        batch_idx = randidx[batch]
+        #train error calculation
+        x_train, y_train = generator(index = batch_idx.astype(int), batch_size = batch_size)
+        y_prediction_train, _ = detector(x_train)
+        train_loss = floss(y_prediction_train, y_train)
+        curr_train_err+=train_loss.item()
+    #test error calculation
+    x_test,y_test = testgenerator()
+    y_prediction_test, _ = detector(x_test)
+    test_loss = floss(y_prediction_test, y_test)
+        
+    # track history
+    train_err.append(curr_train_err/n_train_samples)
+    test_err.append(test_loss.item()/n_test_samples)
+        
     
     for epoch in tnrange(n_epoch):
         randidx = np.random.permutation(n_train_samples)
@@ -223,7 +264,7 @@ def train_routine(detector,
             y_prediction_train, _ = detector(x_train)
             train_loss = floss(y_prediction_train, y_train)
             curr_train_err+=train_loss.item()
-            train_loss+=regk*torch.sum(torch.pow(detector.get_reg_params().__next__(),2))
+            #train_loss+=regk*torch.sum(torch.pow(detector.get_reg_params().__next__(),2))
             # update weights
             train_loss.backward()
             optimizer.step()

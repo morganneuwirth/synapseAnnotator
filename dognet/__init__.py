@@ -30,11 +30,15 @@ from .networks import (
     DeepAnisotropic
 )
 
+from .unet import *
+
 from .training import (
     train_routine,
     create_generator,
     create_test_generator,
-    create_generator_3d
+    create_generator_3d,
+    focal_loss,
+    soft_dice_loss
 )
 
 from .baselines import *
