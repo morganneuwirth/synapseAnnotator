@@ -3,13 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class doubleconv(nn.Module):
-    def __init__(self, in_ch, out_ch,kernel_size=3, pad_size = 1):
+    def __init__(self, in_ch, out_ch):
         super(doubleconv,self).__init__()
         self.dconv = nn.Sequential(
-            nn.Conv2d(in_ch,out_ch,kernel_size,padding=pad_size),
+            nn.Conv2d(in_ch,out_ch,3,padding = 1),
             nn.BatchNorm2d(out_ch),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_ch,out_ch,kernel_size,padding=pad_size),
+            nn.Conv2d(out_ch,out_ch,3,padding = 1),
             nn.BatchNorm2d(out_ch),
             nn.ReLU(inplace=True)
             )
@@ -20,7 +20,7 @@ class doubleconv(nn.Module):
 class inconv(nn.Module):
     def __init__(self,in_ch,out_ch):
         super(inconv,self).__init__()
-        self.conv = doubleconv(in_ch,out_ch,5,2)
+        self.conv = doubleconv(in_ch,out_ch)
     def forward(self,x):
         y = self.conv(x)
         return y
@@ -72,17 +72,17 @@ class outconv(nn.Module):
 class UNet(nn.Module):
     def __init__(self, n_channels=3, n_classes=2):
         super(UNet, self).__init__()
-        self.inc = inconv(n_channels, 32)
-        self.down1 = down(32, 64)
-        self.down2 = down(64, 128)
-        self.down3 = down(128, 256)
-        self.down4 = down(256, 256)
-        self.up1 = up(512, 128)
-        self.up2 = up(256, 64)
-        self.up3 = up(128, 32)
-        self.up4 = up(64, 32)
-        self.outc = outconv(32, n_classes)
-        self.sig = nn.Sigmoid()
+        self.inc = inconv(n_channels, 64)
+        self.down1 = down(64, 128)
+        self.down2 = down(128, 256)
+        self.down3 = down(256, 512)
+        self.down4 = down(512, 512)
+        self.up1 = up(1024, 256)
+        self.up2 = up(512, 128)
+        self.up3 = up(256, 64)
+        self.up4 = up(128, 64)
+        self.outc = outconv(64, n_classes)
+        self.sm = nn.Softmax2d()
 
     def forward(self, x):
         x1 = self.inc(x)
@@ -95,5 +95,5 @@ class UNet(nn.Module):
         x = self.up3(x, x2)
         x = self.up4(x, x1)
         x = self.outc(x)
-        y = self.sig(x)
-        return y, x5
+        y = self.sm(x)
+        return y, None

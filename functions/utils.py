@@ -153,13 +153,14 @@ def get_metric(pts1, pts2, s=5.):
     f1 = 2 * (precision * recall) / (precision + recall)
     return total_positive, correct_positive, precision, recall, f1, gt_res
 
-def inference(net,image,get_inter = False):
+def inference(net,image,get_inter = False,device = torch.device("cpu")):
     x = np.expand_dims(image,0)
-    vx = torch.from_numpy(x).float().cpu()
-    res,inter = net(vx)
+    vx = torch.from_numpy(x).float()
+    cvx = vx.to(device)
+    res, inter = net(cvx)
     if get_inter:
         return res.data.cpu().numpy(),inter.data.cpu().numpy()
-    return res.data.cpu().numpy()
+    return res.data[0].cpu().numpy()
 
 def estimate_quality(collman,net,layer,slices=[2,3,4,5,6],th=0.4):
     mprecision=[]
