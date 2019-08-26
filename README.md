@@ -15,7 +15,6 @@ Morgan Neuwirth - Harvard Medical School Regehr Lab, Summer Internship 2019
     - Anaconda (https://www.anaconda.com/distribution/)
     - pytorch (conda install -c pytorch pytorch)
     - skimage (conda install -c conda-forge scikit-image)
-    - PIL (pip install Pillow)
     - oiffile (pip install oiffile)
 
 ## Normalization
